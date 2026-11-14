@@ -1,44 +1,39 @@
-import json
-from http.server import BaseHTTPRequestHandler
-from ugropy import joback
 
+from flask import Flask, request, jsonify, render_template
+from .temperature import calculer_ebullition, JOBACK_TB_CONTRIBUTIONS
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            name = str(payload.get("nom", "")).strip()
+app = Flask(__name__, template_folder="templates")
 
-            if not name:
-                raise ValueError("Veuillez saisir le nom d'une molécule.")
+# Base d'utilisateurs autorisés (Identifiant : Mot de passe)
+USERS = {
+    "admin": "pic2026",
+    "etudiant1": "chimie123",
+    "user": "password"
+}
 
-            molecule = joback.get_groups(name)
-            temperature = molecule.normal_boiling_point
+@app.route("/")
+def home():
+    return render_template("index.html")
 
-            result = {
-                "success": True,
-                "nom": name,
-                "groupes": str(molecule.subgroups),
-                "temperature": temperature,
-            }
-            self._send_json(200, result)
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.json
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    if username in USERS and USERS[username] == password:
+        return jsonify({"success": True, "username": username})
+    return jsonify({"success": False, "message": "Identifiant ou mot de passe incorrect"}), 401
 
-        except Exception as exc:
-            self._send_json(400, {
-                "success": False,
-                "erreur": str(exc) or "Molécule non reconnue ou groupes indisponibles."
-            })
+@app.route("/api/groups", methods=["GET"])
+def get_groups():
+    return jsonify(list(JOBACK_TB_CONTRIBUTIONS.keys()))
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Allow", "POST, OPTIONS")
-        self.end_headers()
-
-    def _send_json(self, status, data):
-        body = json.dumps(data, ensure_ascii=False, default=str).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+@app.route("/api/calculate", methods=["POST"])
+def calculate():
+    data = request.json
+    groupes = data.get("groupes", {})
+    tb_k = calculer_ebullition(groupes)
+    tb_c = round(tb_k - 273.15, 2)
+    return jsonify({"tb_kelvin": tb_k, "tb_celsius": tb_c})
+           
+   
