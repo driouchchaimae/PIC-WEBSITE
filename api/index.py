@@ -1,39 +1,82 @@
 
-from flask import Flask, request, jsonify, render_template
-from .temperature import calculer_ebullition, JOBACK_TB_CONTRIBUTIONS
+
+   from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__, template_folder="templates")
 
-# Base d'utilisateurs autorisés (Identifiant : Mot de passe)
-USERS = {
-    "admin": "pic2026",
-    "etudiant1": "chimie123",
-    "user": "password"
+# Base de données intégrée des molécules (Groupes Joback + Structure 3D XYZ)
+MOLECULES_DB = {
+    "ethanol": {
+        "groupes": {"-CH3": 1, "-CH2-": 1, "-OH (alcool)": 1},
+        "tb_k": 351.4,
+        "xyz": "9\nEthanol\nC -0.047 0.663 0.000\nC -1.213 -0.312 0.000\nO 1.158 -0.092 0.000\nH -0.056 1.312 0.882\nH -0.056 1.312 -0.882\nH -2.156 0.239 0.000\nH -1.196 -0.955 0.883\nH -1.196 -0.955 -0.883\nH 1.915 0.506 0.000"
+    },
+    "éthanol": {
+        "groupes": {"-CH3": 1, "-CH2-": 1, "-OH (alcool)": 1},
+        "tb_k": 351.4,
+        "xyz": "9\nEthanol\nC -0.047 0.663 0.000\nC -1.213 -0.312 0.000\nO 1.158 -0.092 0.000\nH -0.056 1.312 0.882\nH -0.056 1.312 -0.882\nH -2.156 0.239 0.000\nH -1.196 -0.955 0.883\nH -1.196 -0.955 -0.883\nH 1.915 0.506 0.000"
+    },
+    "benzene": {
+        "groupes": {"=CH- (aromatique)": 6},
+        "tb_k": 353.2,
+        "xyz": "12\nBenzene\nC 0.000 1.396 0.000\nC 1.209 0.698 0.000\nC 1.209 -0.698 0.000\nC 0.000 -1.396 0.000\nC -1.209 -0.698 0.000\nC -1.209 0.698 0.000\nH 0.000 2.479 0.000\nH 2.147 1.240 0.000\nH 2.147 -1.240 0.000\nH 0.000 -2.479 0.000\nH -2.147 -1.240 0.000\nH -2.147 1.240 0.000"
+    },
+    "acetone": {
+        "groupes": {"-CH3": 2, ">C=O (cétone)": 1},
+        "tb_k": 329.2,
+        "xyz": "10\nAcetone\nC 0.000 0.186 0.000\nO 0.000 1.402 0.000\nC -1.286 -0.608 0.000\nC 1.286 -0.608 0.000\nH -2.155 0.052 0.000\nH -1.321 -1.253 0.882\nH -1.321 -1.253 -0.882\nH 2.155 0.052 0.000\nH 1.321 -1.253 0.882\nH 1.321 -1.253 -0.882"
+    },
+    "methanol": {
+        "groupes": {"-CH3": 1, "-OH (alcool)": 1},
+        "tb_k": 314.7,
+        "xyz": "6\nMethanol\nC -0.047 0.663 0.000\nO 1.158 -0.092 0.000\nH -0.056 1.312 0.882\nH -0.056 1.312 -0.882\nH -0.950 0.050 0.000\nH 1.915 0.506 0.000"
+    }
+}
+
+CONTRIBUTIONS = {
+    "-CH3": 23.58,
+    "-CH2-": 22.88,
+    "-OH (alcool)": 92.88,
+    "=CH- (aromatique)": 26.73,
+    ">C=O (cétone)": 76.75
 }
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
-@app.route("/api/login", methods=["POST"])
-def login():
-    data = request.json
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    if username in USERS and USERS[username] == password:
-        return jsonify({"success": True, "username": username})
-    return jsonify({"success": False, "message": "Identifiant ou mot de passe incorrect"}), 401
+# Intercepte n'importe quelle route /api/... appelée par votre HTML
+@app.route("/api", methods=["POST", "OPTIONS"])
+@app.route("/api/<path:subpath>", methods=["POST", "OPTIONS"])
+def handle_api(subpath=""):
+    if request.method == "OPTIONS":
+        return ("", 204)
 
-@app.route("/api/groups", methods=["GET"])
-def get_groups():
-    return jsonify(list(JOBACK_TB_CONTRIBUTIONS.keys()))
+    data = request.get_json(silent=True) or {}
+    nom = str(data.get("nom", "")).strip().lower()
 
-@app.route("/api/calculate", methods=["POST"])
-def calculate():
-    data = request.json
-    groupes = data.get("groupes", {})
-    tb_k = calculer_ebullition(groupes)
-    tb_c = round(tb_k - 273.15, 2)
-    return jsonify({"tb_kelvin": tb_k, "tb_celsius": tb_c})
-           
+    if not nom:
+        return jsonify({"success": False, "erreur": "Veuillez saisir le nom d'une molécule."}), 400
+
+    if nom in MOLECULES_DB:
+        mol = MOLECULES_DB[nom]
+        groupes = mol["groupes"]
+        # Calcul exact par la formule de Joback : Tb = 198.2 + Somme(ni * dTbi)
+        tb = round(198.2 + sum(CONTRIBUTIONS[g] * n for g, n in groupes.items()), 2)
+        groupes_str = ", ".join(f"{n}x {g}" for g, n in groupes.items())
+
+        return jsonify({
+            "success": True,
+            "nom": nom,
+            "groupes": groupes_str,
+            "temperature": tb,
+            "tb_kelvin": tb,
+            "tb_celsius": round(tb - 273.15, 2),
+            "xyz": mol["xyz"]
+        })
+
+    return jsonify({
+        "success": False,
+        "erreur": f"Molécule '{nom}' non trouvée. Essayez : ethanol, methanol, benzene ou acetone."
+    }), 404
    
