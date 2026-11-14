@@ -1,34 +1,26 @@
-
-
-   from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__, template_folder="templates")
 
-# Base de données intégrée des molécules (Groupes Joback + Structure 3D XYZ)
 MOLECULES_DB = {
     "ethanol": {
         "groupes": {"-CH3": 1, "-CH2-": 1, "-OH (alcool)": 1},
-        "tb_k": 351.4,
         "xyz": "9\nEthanol\nC -0.047 0.663 0.000\nC -1.213 -0.312 0.000\nO 1.158 -0.092 0.000\nH -0.056 1.312 0.882\nH -0.056 1.312 -0.882\nH -2.156 0.239 0.000\nH -1.196 -0.955 0.883\nH -1.196 -0.955 -0.883\nH 1.915 0.506 0.000"
     },
     "éthanol": {
         "groupes": {"-CH3": 1, "-CH2-": 1, "-OH (alcool)": 1},
-        "tb_k": 351.4,
         "xyz": "9\nEthanol\nC -0.047 0.663 0.000\nC -1.213 -0.312 0.000\nO 1.158 -0.092 0.000\nH -0.056 1.312 0.882\nH -0.056 1.312 -0.882\nH -2.156 0.239 0.000\nH -1.196 -0.955 0.883\nH -1.196 -0.955 -0.883\nH 1.915 0.506 0.000"
     },
     "benzene": {
         "groupes": {"=CH- (aromatique)": 6},
-        "tb_k": 353.2,
         "xyz": "12\nBenzene\nC 0.000 1.396 0.000\nC 1.209 0.698 0.000\nC 1.209 -0.698 0.000\nC 0.000 -1.396 0.000\nC -1.209 -0.698 0.000\nC -1.209 0.698 0.000\nH 0.000 2.479 0.000\nH 2.147 1.240 0.000\nH 2.147 -1.240 0.000\nH 0.000 -2.479 0.000\nH -2.147 -1.240 0.000\nH -2.147 1.240 0.000"
     },
     "acetone": {
         "groupes": {"-CH3": 2, ">C=O (cétone)": 1},
-        "tb_k": 329.2,
         "xyz": "10\nAcetone\nC 0.000 0.186 0.000\nO 0.000 1.402 0.000\nC -1.286 -0.608 0.000\nC 1.286 -0.608 0.000\nH -2.155 0.052 0.000\nH -1.321 -1.253 0.882\nH -1.321 -1.253 -0.882\nH 2.155 0.052 0.000\nH 1.321 -1.253 0.882\nH 1.321 -1.253 -0.882"
     },
     "methanol": {
         "groupes": {"-CH3": 1, "-OH (alcool)": 1},
-        "tb_k": 314.7,
         "xyz": "6\nMethanol\nC -0.047 0.663 0.000\nO 1.158 -0.092 0.000\nH -0.056 1.312 0.882\nH -0.056 1.312 -0.882\nH -0.950 0.050 0.000\nH 1.915 0.506 0.000"
     }
 }
@@ -45,7 +37,6 @@ CONTRIBUTIONS = {
 def home():
     return render_template("index.html")
 
-# Intercepte n'importe quelle route /api/... appelée par votre HTML
 @app.route("/api", methods=["POST", "OPTIONS"])
 @app.route("/api/<path:subpath>", methods=["POST", "OPTIONS"])
 def handle_api(subpath=""):
@@ -61,7 +52,6 @@ def handle_api(subpath=""):
     if nom in MOLECULES_DB:
         mol = MOLECULES_DB[nom]
         groupes = mol["groupes"]
-        # Calcul exact par la formule de Joback : Tb = 198.2 + Somme(ni * dTbi)
         tb = round(198.2 + sum(CONTRIBUTIONS[g] * n for g, n in groupes.items()), 2)
         groupes_str = ", ".join(f"{n}x {g}" for g, n in groupes.items())
 
@@ -79,4 +69,10 @@ def handle_api(subpath=""):
         "success": False,
         "erreur": f"Molécule '{nom}' non trouvée. Essayez : ethanol, methanol, benzene ou acetone."
     }), 404
+
    
+        
+    
+
+    
+            
